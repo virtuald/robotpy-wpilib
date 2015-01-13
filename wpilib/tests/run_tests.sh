@@ -19,6 +19,7 @@ EXAMPLES="
 	sample/
 	test/
 	
+	examples/CANTalon/
 	examples/GettingStarted/
 	examples/MecanumDrive/
 	examples/MotorControl/

@@ -1276,10 +1276,12 @@ def clearAllPCMStickyFaults_sol(solenoid_port, status):
 # TalonSRX
 #############################################################################
 def c_TalonSRX_Create(deviceNumber, controlPeriodMs):
-    assert False # TODO
+    assert deviceNumber not in hal_data['CAN']
+    return types.TalonSRX(deviceNumber)
+    
 
 def c_TalonSRX_Destroy(handle):
-    assert False # TODO
+    del hal_data['CAN'][handle.id]
 
 def c_TalonSRX_SetParam(handle, paramEnum, value):
     assert False # TODO
@@ -1453,7 +1455,7 @@ def c_TalonSRX_SetDemand(handle, param):
     assert False # TODO
 
 def c_TalonSRX_SetOverrideLimitSwitchEn(handle, param):
-    assert False # TODO
+    hal_data['CAN'][handle.id]['']
 
 def c_TalonSRX_SetFeedbackDeviceSelect(handle, param):
     assert False # TODO
