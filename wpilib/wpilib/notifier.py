@@ -64,6 +64,7 @@ class Notifier:
             hal.updateNotifierAlarm(handle, int(self._expirationTime * 1e6))
     
     def _thread(self) -> None:
+        assert False
         while True:
             notifier = self._notifier
             if not notifier:

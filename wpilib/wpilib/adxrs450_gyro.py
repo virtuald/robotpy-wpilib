@@ -1,6 +1,6 @@
-# validated: 2017-09-20 AA e1195e8b9dab edu/wpi/first/wpilibj/ADXRS450_Gyro.java
+# validated: 2017-12-24 DS 7f074563d06f edu/wpi/first/wpilibj/ADXRS450_Gyro.java
 #----------------------------------------------------------------------------
-# Copyright (c) FIRST 2015. All Rights Reserved.
+# Copyright (c) FIRST 2015-2017. All Rights Reserved.
 # Open Source Software - may be modified and shared by FRC teams. The code
 # must be accompanied by the FIRST BSD license file in the root directory of
 # the project.
@@ -10,7 +10,6 @@ import hal
 
 from .driverstation import DriverStation
 from .gyrobase import GyroBase
-from .livewindow import LiveWindow
 from .spi import SPI
 from .timer import Timer
 
@@ -29,7 +28,7 @@ class ADXRS450_Gyro(GyroBase):
     This class is for the digital ADXRS450 gyro sensor that connects via SPI.
     """
     
-    kSamplePeriod = 0.001
+    kSamplePeriod = 0.0005
     kCalibrationSampleTime = 5.0
     kDegreePerSecondPerLSB = 0.0125
 
@@ -80,7 +79,7 @@ class ADXRS450_Gyro(GyroBase):
         self.calibrate()
         
         hal.report(hal.UsageReporting.kResourceType_ADXRS450, port)
-        LiveWindow.addSensor("ADXRS450_Gyro", port, self)
+        self.setName('ADXRS450_Gyro', port)
 
     def calibrate(self):
         """Calibrate the gyro by running for a number of samples and computing the
@@ -146,6 +145,7 @@ class ADXRS450_Gyro(GyroBase):
         
     def free(self):
         """Delete (free) the spi port used for the gyro and stop accumulating."""
+        super().free()
         if self.spi is not None:
             self.spi.free()
             self.spi = None

@@ -40,13 +40,7 @@ class SPISimulator(SPISimBase):
         status.value = 0
         self.set_active_low = True
 
-    def freeSPIAccumulator(self, port, status):
-        status.value = 0
-        self.acc_freed = True
-        
-    def resetSPIAccumulator(self, port, status):
-        status.value = 0
-        self.acc_reset = True
+    
         
     def getSPIAccumulatorLastValue(self, port, status):
         assert port == self.port
@@ -73,7 +67,9 @@ class SPISimulator(SPISimBase):
         status.value = 0
         return (0x99, 1)
         
-def test_spi(wpilib):
+def test_spi(wpilib, monkeypatch):
+    
+    monkeypatch.setattr(wpilib.Notifier, '_thread', lambda s: None)
     
     sim = SPISimulator()
     port = wpilib.SPI.Port.kMXP
@@ -116,14 +112,22 @@ def test_spi(wpilib):
         spi.port
     
 
-def test_adxrs450(wpilib, hal_data):
+def test_adxrs450(wpilib, hal_data, monkeypatch, sim_hooks):
+    
+    monkeypatch.setattr(wpilib.Notifier, '_thread', lambda s: None)
     
     gyro = wpilib.ADXRS450_Gyro()
     
     hal_data['robot']['adxrs450_spi_0_angle'] = 10
-    assert abs(gyro.getAngle() - 10) < 0.001
+    
+    for i in range(10):
+        sim_hooks.time = i*.1
+        assert gyro.getAngle() == pytest.approx(10)
     
     hal_data['robot']['adxrs450_spi_0_rate'] = 5
-    assert abs(gyro.getRate() - 5) < 0.001
+    sim_hooks.time = 2
+    print("=== time is 1 ===")
+    
+    assert gyro.getRate() == pytest.approx(5)
     
     

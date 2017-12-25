@@ -2,6 +2,8 @@
 from . import data
 hal_data = data.hal_data
 
+from . import functions
+
 class SPISimBase:
     '''
         Base class to use for SPI protocol simulators.
@@ -58,41 +60,64 @@ class SPISimBase:
     def setSPIHandle(self, port, handle):
         pass
         
-    def initSPIAccumulator(self, port,
-                           period, cmd, xfer_size, valid_mask, valid_value,
-                           data_shift, data_size, is_signed, big_endian, status):
-        pass
+    def initSPIAuto(self, port, bufferSize, status):
+        status.value = 0
+
+    def freeSPIAuto(self, port, status):
+        status.value = 0
+
+    def startSPIAutoRate(self, port, period, status):
+        status.value = 0
+        #self._autoPeriod = period
+        #self._autoLastRead = functions.hooks.getTime()
+
+    def startSPIAutoTrigger(self, port, digitalSourceHandle, analogTriggerType, triggerRising, triggerFalling, status):
+        status.value = 0
+
+    def stopSPIAuto(self, port, status):
+        status.value = 0
+
+    def setSPIAutoTransmitData(self, port, dataToSend, dataSize, zeroSize, status):
+        status.value = 0
+
+    def forceSPIAutoRead(self, port, status):
+        status.value = 0
+
+    def readSPIAutoReceivedData(self, port, buffer, numToRead, timeout, status):
+        ''':returns: number of bytes read'''
+        status.value = 0
         
-    def freeSPIAccumulator(self, port, status):
-        pass
+        # just fill the buffer with a single value
+        val = self._readSPIAutoReceivedData()
+        valSz = len(val)
         
-    def resetSPIAccumulator(self, port, status):
-        pass
-    
-    def setSPIAccumulatorCenter(self, port, center, status):
-        pass
+        if numToRead != 1:
+            buffer[0:valSz] = val
         
-    def setSPIAccumulatorDeadband(self, port, deadband, status):
-        pass
+        return valSz
         
-    def getSPIAccumulatorLastValue(self, port, status):
+        now = functions.hooks.getTime()
+        samples = int((now - self._autoLastRead) / self._autoPeriod)
+        if numToRead == 0:
+            return samples
+        
+        self._autoLastRead = now
+        
+        off = 0
+        for i in range(samples):
+            ooff = off
+            off += valSz
+            buffer[ooff:off] = val
+        
+        return off
+        
+    # subclasses: implement this instead, returning a single value. The value
+    #             will get scaled properly by the update rate
+    def _readSPIAutoReceivedData(self) -> bytes:
+        raise NotImplementedError
+
+    def getSPIAutoDroppedCount(self, port, status):
         ''':returns: int32'''
-        raise NotImplementedError
-        
-    def getSPIAccumulatorValue(self, port, status):
-        ''':returns: int64'''
-        raise NotImplementedError
-        
-    def getSPIAccumulatorCount(self, port, status):
-        ''':returns: int32'''
-        raise NotImplementedError
-    
-    def getSPIAccumulatorAverage(self, port, status):
-        ''':returns: float'''
-        raise NotImplementedError
-        
-    def getSPIAccumulatorOutput(self, port, status):
-        ''':returns: value(int64), count(int32)'''
         raise NotImplementedError
         
 
@@ -109,25 +134,46 @@ class ADXRS450_Gyro_Sim(SPISimBase):
     def __init__(self, gyro):
         self.kDegreePerSecondPerLSB = gyro.kDegreePerSecondPerLSB
         self.kSamplePeriod = gyro.kSamplePeriod
+        
+        self.maxSegments = 2048
+        self.maxAnglePerSegment = 0x7fff * self.kSamplePeriod * self.kDegreePerSecondPerLSB
+        
+        self.lastAngle = 0
     
     def initializeSPI(self, port, status):
         self.angle_key = 'adxrs450_spi_%d_angle' % port
         self.rate_key = 'adxrs450_spi_%d_rate' % port
+    
+    def setSPIAutoTransmitData(self, port, data_to_send, sendSize, zeroSize, status):
+        status.value = 0
+    
+    def readSPIAutoReceivedData(self, port, buffer, numToRead, timeout, status):
+        ''':returns: number of bytes read'''
+        status.value = 0
         
-        print(self.angle_key)
-    
-    def getSPIAccumulatorAverage(self, port, status):
-        return 0
-    
-    def getSPIAccumulatorValue(self, port, status):
-        return int(hal_data['robot'].get(self.angle_key, 0) / (self.kDegreePerSecondPerLSB * self.kSamplePeriod))
-    
-    def getSPIAccumulatorLastValue(self, port, status):
-        return int(hal_data['robot'].get(self.rate_key, 0) / self.kDegreePerSecondPerLSB)
-    
-    # for calibrate
-    def writeSPI(self, port, data_to_send, send_size):
-        return send_size
+        current = hal_data['robot'].get(self.angle_key, 0)
+        offset = current - self.lastAngle
+        samples = 1 + int(offset / self.maxAnglePerSegment)
+        samples = min(samples, self.maxSegments)
+        
+        # challenge: compute the amount of angle we're communicating without
+        #            losing any..
+        
+        if numToRead != 0:
+            # This is annoying, because we have to compute the offset from where we
+            # are, then piece it up in up to 2048 chunks
+            
+            
+            print("preoff",offset)
+            offset = offset / (self.kSamplePeriod * self.kDegreePerSecondPerLSB)
+            print('offset', offset, int(offset) & 0xffff, offset * 6.25e-06)
+            
+            data = 0x4000000 | ((int(offset) & 0xffff) << 10)
+            #sprint('data %x %x %s' % (data, offset & 0xffff, self.kSamplePeriod * self.kDegreePerSecondPerLSB))
+            
+            buffer[0:4] = data.to_bytes(4, 'big')
+        
+        return samples * 4
     
     def readSPI(self, port, buffer, count):
         buffer[:] = (0xff000000 | (0x5200 << 5)).to_bytes(4, 'big')
